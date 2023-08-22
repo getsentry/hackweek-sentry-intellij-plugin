@@ -1,0 +1,13 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>io.sentry.intellij</id>
+    <name>Sentry Intellij Plugin</name>
+    <vendor>sentry.io</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Sample Calendar" secondary="true" icon="AllIcons.Toolwindows.WebToolWindow" anchor="bottom"
+                    factoryClass="io.sentry.intellij.toolWindow.SentryToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
