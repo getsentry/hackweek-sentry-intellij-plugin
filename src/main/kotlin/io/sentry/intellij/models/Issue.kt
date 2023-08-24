@@ -3,7 +3,7 @@ package io.sentry.intellij.models
 import com.google.gson.annotations.SerializedName
 
 data class Issue(
-    @SerializedName("id") var id: String? = null,
+    @SerializedName("id") var id: String,
     @SerializedName("shareId") var shareId: String? = null,
     @SerializedName("shortId") var shortId: String? = null,
     @SerializedName("title") var title: String? = null,

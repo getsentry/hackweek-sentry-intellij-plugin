@@ -4,15 +4,46 @@ import com.google.gson.annotations.SerializedName
 
 data class IssueEvent(
     @SerializedName("id") val id: String? = null,
-    @SerializedName("entries") val entries: List<Entry> = emptyList()
-)
+    @SerializedName("entries") val entries: List<Entry> = emptyList(),
+) {
+  fun stackTraceHeaderToString(entryIndex: Int): String {
+    val stackTraceValue = entries[entryIndex].data?.values?.firstOrNull()
+    val module = stackTraceValue?.module ?: ""
+    val valueMessage = stackTraceValue?.value ?: ""
+    val type = stackTraceValue?.type ?: ""
+    val stackTraceBuilder = StringBuilder()
+    stackTraceBuilder
+        .append(module)
+        .append(".")
+        .append(type)
+        .append(": ")
+        .append(valueMessage)
+        .append("\n")
+    return stackTraceBuilder.toString()
+  }
+
+  fun stackTraceBodyToString(entryIndex: Int): String {
+    val stackTraceValue = entries[entryIndex].data?.values?.firstOrNull()
+    val frames = stackTraceValue?.stacktrace?.frames ?: emptyList()
+    val stackTraceBuilder = StringBuilder()
+    for (i in frames.size - 1 downTo 0) {
+      val text =
+          "\t${frames[i].module}.${frames[i].function}(${frames[i].filename}:${frames[i].lineNo})"
+      stackTraceBuilder.append(text).append("\n")
+    }
+    return stackTraceBuilder.toString()
+  }
+}
 
 data class Entry(@SerializedName("data") val data: EntryData? = null)
 
 data class EntryData(@SerializedName("values") val values: List<EntryDataValue> = emptyList())
 
 data class EntryDataValue(
-    @SerializedName("stacktrace") val stacktrace: EntryDataValueStacktrace? = null
+    @SerializedName("stacktrace") val stacktrace: EntryDataValueStacktrace? = null,
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("value") val value: String? = null,
+    @SerializedName("module") val module: String? = null
 )
 
 data class EntryDataValueStacktrace(

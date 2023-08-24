@@ -1,181 +1,189 @@
 package io.sentry.intellij.toolWindow
 
-import com.google.gson.Gson
+import com.intellij.execution.impl.ConsoleViewImpl
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ThreeComponentsSplitter
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLoadingPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
-import io.sentry.intellij.models.Frames
+import io.sentry.intellij.http.ApiService
+import io.sentry.intellij.http.OkHttpClientProvider
 import io.sentry.intellij.models.Issue
 import io.sentry.intellij.ui.IssuesOverviewPanel
+import io.sentry.intellij.ui.printSentryStackTrace
 import java.awt.BorderLayout
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.*
-import javax.swing.*
+import javax.swing.JComponent
+import javax.swing.JPanel
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class SentryToolWindowFactory : ToolWindowFactory, DumbAware {
+class SentryToolWindowFactory : ToolWindowFactory {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-    val toolWindowContent = CalendarToolWindowContent(toolWindow)
+    val orgSlug = "sentry-sdks"
+    val projectSlug = "sentry-android"
+    val apiService = ApiService(OkHttpClientProvider.provideClient(), orgSlug, projectSlug)
+    val toolWindowContent = SentryToolWindowContent(project, toolWindow, apiService)
     val content =
         ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
     toolWindow.contentManager.addContent(content)
   }
 
-  private class CalendarToolWindowContent(toolWindow: ToolWindow) : Disposable {
-    // TODO: this should not be hardcoded!
-    private val authToken = "..."
+  private class SentryToolWindowContent(
+      project: Project,
+      toolWindow: ToolWindow,
+      private val apiService: ApiService
+  ) {
+    // First (left-most) panel that displays the issues overview
+    private val firstLoadingPanel: JBLoadingPanel
 
-    val loadingPanel =
-        JBLoadingPanel(BorderLayout(), toolWindow.disposable).apply { layout = BorderLayout() }
-    val component2 = JPanel().apply { background = JBColor.BLUE }
-    val component3 = JPanel().apply { background = JBColor.RED }
+    // Inner panel that displays the stack trace of the selected issue
+    private val innerLoadingPanel: JBLoadingPanel
 
-    private val splitter =
-        ThreeComponentsSplitter(toolWindow.disposable).apply {
-          val windowSize = toolWindow.component.size
-          firstSize = windowSize.width / 4
-          lastSize = windowSize.width / 4
-          firstComponent = loadingPanel
-          innerComponent = component2
-          lastComponent = component3
-        }
-
-    val contentPanel: JComponent =
-        JPanel().apply {
-          layout = BorderLayout()
-          add(splitter, BorderLayout.CENTER)
-        }
+    // Last panel that displays metadata about the selected issue
+    private val component3: JPanel
+    private var consoleView: ConsoleViewImpl
+    private var issuesOverviewPanel: IssuesOverviewPanel
+    private var selectedIssue: Issue? = null
+    private val splitter: ThreeComponentsSplitter
+    val contentPanel: JComponent
 
     init {
-      getFromSentry()
-    }
-
-    private fun getFromSentry() {
-      val gson = Gson()
-
-      loadingPanel.startLoading()
-      GlobalScope.launch {
-        val issueArrays: Array<Issue> =
-            gson.fromJson(
-                request("https://sentry.io/api/0/projects/sentry-sdks/sentry-android/issues/"),
-                Array<Issue>::class.java)
-        val issuesOverviewPanel = IssuesOverviewPanel(issueArrays.toList())
-        val scrollPane = JBScrollPane(issuesOverviewPanel)
-
-        /*
-        val issueEvents = eventArray.take(1).map {
-            gson.fromJson(
-                request("https://sentry.io/api/0/issues/${it.id}/events/latest/"),
-                IssueEvent::class.java
-            )
-        }
-        issueEvents.forEach {
-            val frames = it.entries[1].data?.values?.get(0)?.stacktrace?.frames
-            frames?.let {
-                val stackTracePanel = StackTracePanel(it)
-                val stackTraceScrollPane = JBScrollPane(stackTracePanel)
-                stackTraceScrollPane.maximumSize = Dimension(500, Int.MAX_VALUE)
-
-                //contentPanel.rightComponent = stackTraceScrollPane // Set right component
-            }
-        }*/
-        println("eventArray: $issueArrays")
-        loadingPanel.add(scrollPane, BorderLayout.CENTER)
-        loadingPanel.stopLoading()
-      }
-    }
-
-    private fun request(urlString: String): String? {
-      try {
-        val url = URL(urlString)
-        val connection = url.openConnection() as HttpURLConnection
-
-        // Set request method (GET, POST, etc.)
-        connection.requestMethod = "GET"
-
-        // Set the Authorization header with Bearer token
-        connection.setRequestProperty("Authorization", "Bearer $authToken")
-        val responseCode = connection.responseCode
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-          val `in` = BufferedReader(InputStreamReader(connection.inputStream))
-          var inputLine: String?
-          val response = StringBuilder()
-          while (`in`.readLine().also { inputLine = it } != null) {
-            response.append(inputLine)
+      firstLoadingPanel = createLoadingPanel(toolWindow.disposable)
+      innerLoadingPanel = createLoadingPanel(toolWindow.disposable)
+      issuesOverviewPanel =
+          createIssuesOverviewPanel().also {
+            val scrollPane = JBScrollPane(it)
+            firstLoadingPanel.add(scrollPane, BorderLayout.CENTER)
           }
-          `in`.close()
-          return response.toString()
-        } else {
-          println("HTTP Request failed with response code: $responseCode")
-        }
-      } catch (e: Exception) {
-        e.printStackTrace()
-      }
-      return null
+      consoleView =
+          createConsoleView(project).also {
+            innerLoadingPanel.add(it.component, BorderLayout.CENTER)
+          }
+      component3 = createComponent3()
+      val windowManager = WindowManager.getInstance()
+      val mainFrame = windowManager.getIdeFrame(project)
+      val windowSize = mainFrame?.component?.size
+      val windowWidth = windowSize?.width ?: 200
+      splitter =
+          createSplitter(
+              firstLoadingPanel,
+              innerLoadingPanel,
+              component3,
+              toolWindow,
+              windowWidth / 4,
+              windowWidth / 4)
+      contentPanel = createContentPanel(splitter)
+      GlobalScope.launch { loadData() }
     }
 
-    override fun dispose() {
-      TODO("Not yet implemented")
+    private fun createLoadingPanel(disposable: Disposable): JBLoadingPanel {
+      return JBLoadingPanel(BorderLayout(), disposable).apply { layout = BorderLayout() }
+    }
+
+    private fun createConsoleView(project: Project): ConsoleViewImpl {
+      return ConsoleViewImpl(project, true)
+    }
+
+    private fun createComponent3(): JPanel {
+      return JPanel().apply { background = JBColor.RED }
+    }
+
+    private fun createSplitter(
+        loadingPanel: JBLoadingPanel,
+        innerLoadingPanel: JBLoadingPanel,
+        component3: JPanel,
+        toolWindow: ToolWindow,
+        firstSize: Int,
+        lastSize: Int,
+    ): ThreeComponentsSplitter {
+      val splitter =
+          ThreeComponentsSplitter(toolWindow.disposable).apply {
+            this@apply.firstSize = firstSize
+            this@apply.lastSize = lastSize
+            firstComponent = loadingPanel
+            innerComponent = innerLoadingPanel
+            lastComponent = component3
+          }
+      return splitter
+    }
+
+    private fun createContentPanel(splitter: ThreeComponentsSplitter): JComponent {
+      return JPanel().apply {
+        layout = BorderLayout()
+        add(splitter, BorderLayout.CENTER)
+      }
+    }
+
+    /**
+     * Complete (total) loading of issues and issue events. This is used during initialization but
+     * can also be used to refresh all data.
+     */
+    private suspend fun loadData() {
+      suspendingTotalLoadingSequence {
+        val issues = apiService.fetchIssues()
+        issuesOverviewPanel.updateIssues(issues)
+        loadInitialIssueEvent(issues)
+      }
+    }
+
+    private fun createIssuesOverviewPanel(): IssuesOverviewPanel {
+      val issuesOverviewPanel = IssuesOverviewPanel()
+      issuesOverviewPanel.onIssueSelected = ::handleIssueSelected
+      return issuesOverviewPanel
+    }
+
+    /**
+     * Loads the latest issue event for the first issue in the list. This is only done once when the
+     * tool window is opened.
+     */
+    private suspend fun loadInitialIssueEvent(issues: Array<Issue>) {
+      if (selectedIssue == null && issues.isNotEmpty()) {
+        selectedIssue = issues.first()
+        loadIssueEvent(issues.first().id)
+      }
+    }
+
+    /** Loads the latest issue event for the selected issue. */
+    private suspend fun loadIssueEvent(issueId: String) {
+      consoleView.clear()
+      innerLoadingPanel.startLoading()
+      val latestIssueEvent = apiService.fetchLatestIssueEvent(issueId)
+      latestIssueEvent?.let { consoleView.printSentryStackTrace(it) }
+      innerLoadingPanel.stopLoading()
+    }
+
+    private fun handleIssueSelected(issue: Issue) {
+      if (issue != selectedIssue) {
+        selectedIssue = issue
+        GlobalScope.launch { loadIssueEvent(issue.id) }
+      }
+    }
+
+    /** Starts the total loading state of the tool window. */
+    private fun startTotalLoading() {
+      firstLoadingPanel.startLoading()
+      innerLoadingPanel.startLoading()
+    }
+
+    /** Stops the total loading state of the tool window. */
+    private fun stopTotalLoading() {
+      firstLoadingPanel.stopLoading()
+      innerLoadingPanel.stopLoading()
+    }
+
+    /**
+     * Kotlin idiomatic way to wrap any code that requires total loading state during execution of a
+     * code-block.
+     */
+    private suspend fun suspendingTotalLoadingSequence(action: suspend () -> Unit) {
+      startTotalLoading()
+      action()
+      stopTotalLoading()
     }
   }
-}
-
-class StackTracePanel(stackTraceFrames: List<Frames>) : JPanel() {
-  private val stackTraceTextArea: JTextArea
-
-  init {
-    layout = BorderLayout()
-    setSize(500, 500)
-    stackTraceTextArea = JTextArea()
-    stackTraceTextArea.isEditable = false
-
-    val scrollPane = JBScrollPane(stackTraceTextArea)
-    add(scrollPane, BorderLayout.CENTER)
-
-    scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS
-    scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-
-    // TODO: Scroll
-    displayStackTrace(stackTraceFrames)
-  }
-
-  private fun displayStackTrace(frames: List<Frames>) {
-    val stackTraceText = StringBuilder()
-    for (i in frames.size - 1 downTo 0) {
-      var tab = "\t"
-      if (i == frames.size - 1) {
-        tab = ""
-      }
-      val text =
-          "${tab}${frames[i].module}.${frames[i].function}(${frames[i].filename}:${frames[i].lineNo})"
-      stackTraceText.append(text).append("\n")
-    }
-    stackTraceTextArea.text = stackTraceText.toString()
-  }
-}
-
-fun createMainSplitter(disposable: Disposable): ThreeComponentsSplitter {
-  val mainSplitter =
-      ThreeComponentsSplitter(disposable).apply {
-        val loadingPanel = JPanel().apply { background = JBColor.LIGHT_GRAY }
-        val component2 = JPanel().apply { background = JBColor.BLUE }
-        val component3 = JPanel().apply { background = JBColor.YELLOW }
-        firstSize = 100
-        lastSize = 100
-        firstComponent = loadingPanel
-        innerComponent = component2
-        lastComponent = component3
-      }
-  return mainSplitter
 }

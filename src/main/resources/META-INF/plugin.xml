@@ -7,7 +7,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="Sample Calendar" secondary="true" icon="AllIcons.Toolwindows.WebToolWindow" anchor="bottom"
+        <toolWindow id="Sentry Insight" secondary="true" icon="AllIcons.Toolwindows.WebToolWindow" anchor="bottom"
                     factoryClass="io.sentry.intellij.toolWindow.SentryToolWindowFactory"/>
     </extensions>
 </idea-plugin>
