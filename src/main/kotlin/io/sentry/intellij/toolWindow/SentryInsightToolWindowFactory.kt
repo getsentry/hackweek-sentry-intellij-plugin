@@ -22,18 +22,18 @@ import javax.swing.JPanel
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class SentryToolWindowFactory : ToolWindowFactory {
+class SentryInsightToolWindowFactory : ToolWindowFactory {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val orgSlug = "sentry-sdks"
     val projectSlug = "sentry-android"
     val apiService = ApiService(OkHttpClientProvider.provideClient(), orgSlug, projectSlug)
-    val toolWindowContent = SentryToolWindowContent(project, toolWindow, apiService)
+    val toolWindowContent = SentryInsightToolWindowContent(project, toolWindow, apiService)
     val content =
         ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
     toolWindow.contentManager.addContent(content)
   }
 
-  private class SentryToolWindowContent(
+  private class SentryInsightToolWindowContent(
       project: Project,
       toolWindow: ToolWindow,
       private val apiService: ApiService

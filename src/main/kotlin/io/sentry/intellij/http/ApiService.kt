@@ -37,8 +37,13 @@ class ApiService(
               }
 
               override fun onResponse(call: Call, response: Response) {
-                val issues = gson.fromJson(response.body?.string(), Array<Issue>::class.java)
-                continuation.resume(issues)
+                if (response.code == 200) {
+                  val issues = gson.fromJson(response.body?.string(), Array<Issue>::class.java)
+                  continuation.resume(issues)
+                } else {
+                  println("Response failed with status: ${response.code}")
+                  continuation.resume(emptyArray())
+                }
               }
             })
       }
