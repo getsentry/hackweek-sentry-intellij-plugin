@@ -1,6 +1,5 @@
 package io.sentry.intellij.toolWindow
 
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -19,20 +18,20 @@ import javax.swing.event.DocumentListener
 /**
  * This class is responsible for creating the Sentry Setup tool window.
  *
- * The Sentry Setup tool window is used to connect to a Sentry project.
- * It will require the user to enter an authentication token, organization slug, and project slug.
+ * The Sentry Setup tool window is used to connect to a Sentry project. It will require the user to
+ * enter an authentication token, organization slug, and project slug.
  */
 class SentrySetupToolWindowFactory : ToolWindowFactory, DumbAware {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val toolWindowContent = SentrySetupToolWindowContent(project, toolWindow)
     val content =
-      ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
+        ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
     toolWindow.contentManager.addContent(content)
   }
 
   private class SentrySetupToolWindowContent(
-    project: Project,
-    toolWindow: ToolWindow,
+      project: Project,
+      toolWindow: ToolWindow,
   ) {
     val contentPanel: JComponent
 
@@ -62,37 +61,38 @@ class HeaderTextFieldContainer(labelText: String) : JPanel() {
   init {
     layout = BoxLayout(this, BoxLayout.Y_AXIS)
 
-    add(JBLabel(labelText).apply {
-      alignmentX = Component.LEFT_ALIGNMENT
-    })
+    add(JBLabel(labelText).apply { alignmentX = Component.LEFT_ALIGNMENT })
 
     // Add vertical spacing
     add(Box.createVerticalStrut(5))
 
-    add(JBTextField().apply {
-      alignmentX = Component.LEFT_ALIGNMENT
-      preferredSize = Dimension(220, 30)
-      maximumSize = Dimension(220, 30)
-      document.addDocumentListener(object : DocumentListener {
-        override fun insertUpdate(e: javax.swing.event.DocumentEvent?) {
-          textFieldText = text
-        }
+    add(
+        JBTextField().apply {
+          alignmentX = Component.LEFT_ALIGNMENT
+          preferredSize = Dimension(220, 30)
+          maximumSize = Dimension(220, 30)
+          document.addDocumentListener(
+              object : DocumentListener {
+                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) {
+                  textFieldText = text
+                }
 
-        override fun removeUpdate(e: javax.swing.event.DocumentEvent?) {
-          textFieldText = text
-        }
+                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) {
+                  textFieldText = text
+                }
 
-        override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
-      })
-    })
+                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
+              })
+        })
   }
 }
 
 class Bo : JPanel() {
-  private val successLabel = JBLabel("Connection successful").apply {
-    isVisible = false
-    foreground = JBColor.GREEN
-  }
+  private val successLabel =
+      JBLabel("Connection successful").apply {
+        isVisible = false
+        foreground = JBColor.GREEN
+      }
 
   var onConnectButtonClicked: (() -> Unit)? = null
   var isSuccessLabelVisible = false
@@ -100,6 +100,7 @@ class Bo : JPanel() {
       field = value
       successLabel.isVisible = value
     }
+
   val authTokenContainer: HeaderTextFieldContainer
   val orgSlugContainer: HeaderTextFieldContainer
   val projectSlugContainer: HeaderTextFieldContainer
@@ -114,9 +115,7 @@ class Bo : JPanel() {
     projectSlugContainer = HeaderTextFieldContainer("Project Slug")
     add(projectSlugContainer)
     val connectButton = JButton("Connect")
-    connectButton.addActionListener {
-      onConnectButtonClicked?.invoke()
-    }
+    connectButton.addActionListener { onConnectButtonClicked?.invoke() }
     add(connectButton)
     add(successLabel)
   }

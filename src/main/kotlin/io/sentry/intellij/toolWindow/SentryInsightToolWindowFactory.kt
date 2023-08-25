@@ -25,21 +25,20 @@ class SentryInsightToolWindowFactory : ToolWindowFactory {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val toolWindowContent = SentryInsightToolWindowContent(project, toolWindow)
     val content =
-      ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
+        ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
     toolWindow.contentManager.addContent(content)
   }
 
   private class SentryInsightToolWindowContent(
-    project: Project,
-    toolWindow: ToolWindow,
+      project: Project,
+      toolWindow: ToolWindow,
   ) {
     // First (left-most) panel that displays the issues overview
     private val firstLoadingPanel: JBLoadingPanel
-
     // Inner panel that displays the stack trace of the selected issue
     private val innerLoadingPanel: JBLoadingPanel
-
-    // Last (right-most) panel that displays metadata about the selected issue (tags, context, device, etc...)
+    // Last (right-most) panel that displays metadata about the selected issue (tags, context,
+    // device, etc...)
     private val metadataPanel: JPanel
     private var consoleView: ConsoleViewImpl
     private var issuesOverviewPanel: IssuesOverviewPanel
@@ -52,28 +51,27 @@ class SentryInsightToolWindowFactory : ToolWindowFactory {
       firstLoadingPanel = createLoadingPanel(toolWindow.disposable)
       innerLoadingPanel = createLoadingPanel(toolWindow.disposable)
       issuesOverviewPanel =
-        createIssuesOverviewPanel().also {
-          val scrollPane = JBScrollPane(it)
-          firstLoadingPanel.add(scrollPane, BorderLayout.CENTER)
-        }
+          createIssuesOverviewPanel().also {
+            val scrollPane = JBScrollPane(it)
+            firstLoadingPanel.add(scrollPane, BorderLayout.CENTER)
+          }
       consoleView =
-        createConsoleView(project).also {
-          innerLoadingPanel.add(it.component, BorderLayout.CENTER)
-        }
+          createConsoleView(project).also {
+            innerLoadingPanel.add(it.component, BorderLayout.CENTER)
+          }
       metadataPanel = createMetadataPanel()
       val windowManager = WindowManager.getInstance()
       val mainFrame = windowManager.getIdeFrame(project)
       val windowSize = mainFrame?.component?.size
       val windowWidth = windowSize?.width ?: 200
       splitter =
-        createSplitter(
-          firstLoadingPanel,
-          innerLoadingPanel,
-          metadataPanel,
-          toolWindow,
-          windowWidth / 4,
-          windowWidth / 4
-        )
+          createSplitter(
+              firstLoadingPanel,
+              innerLoadingPanel,
+              metadataPanel,
+              toolWindow,
+              windowWidth / 4,
+              windowWidth / 4)
       contentPanel = createContentPanel(splitter)
       // TODO: This should not hardcoded but cached in the Setup toolWindow
       val authToken = "..."
@@ -82,7 +80,8 @@ class SentryInsightToolWindowFactory : ToolWindowFactory {
       if (authToken == null || orgSlug == null || projectSlug == null) {
         // TODO: show a message to the user that they need to set up the project connection
       } else {
-        apiService = ApiService(OkHttpClientProvider.provideClient(), orgSlug, projectSlug, authToken)
+        apiService =
+            ApiService(OkHttpClientProvider.provideClient(), orgSlug, projectSlug, authToken)
         GlobalScope.launch { loadData() }
       }
     }
@@ -100,21 +99,21 @@ class SentryInsightToolWindowFactory : ToolWindowFactory {
     }
 
     private fun createSplitter(
-      loadingPanel: JBLoadingPanel,
-      innerLoadingPanel: JBLoadingPanel,
-      component3: JPanel,
-      toolWindow: ToolWindow,
-      firstSize: Int,
-      lastSize: Int,
+        loadingPanel: JBLoadingPanel,
+        innerLoadingPanel: JBLoadingPanel,
+        metadataPanel: JPanel,
+        toolWindow: ToolWindow,
+        firstSize: Int,
+        lastSize: Int,
     ): ThreeComponentsSplitter {
       val splitter =
-        ThreeComponentsSplitter(toolWindow.disposable).apply {
-          this@apply.firstSize = firstSize
-          this@apply.lastSize = lastSize
-          firstComponent = loadingPanel
-          innerComponent = innerLoadingPanel
-          lastComponent = component3
-        }
+          ThreeComponentsSplitter(toolWindow.disposable).apply {
+            this@apply.firstSize = firstSize
+            this@apply.lastSize = lastSize
+            firstComponent = loadingPanel
+            innerComponent = innerLoadingPanel
+            lastComponent = metadataPanel
+          }
       return splitter
     }
 
