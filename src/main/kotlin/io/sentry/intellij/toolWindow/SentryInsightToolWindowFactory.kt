@@ -75,7 +75,7 @@ class SentryInsightToolWindowFactory : ToolWindowFactory {
           windowWidth / 4
         )
       contentPanel = createContentPanel(splitter)
-      // TODO: Replace this with PropertiesComponentUtils
+      // TODO: This should not hardcoded but cached in the Setup toolWindow
       val authToken = "..."
       val orgSlug = "sentry-sdks"
       val projectSlug = "sentry-android"

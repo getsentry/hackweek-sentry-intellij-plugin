@@ -50,7 +50,6 @@ class SentrySetupToolWindowFactory : ToolWindowFactory, DumbAware {
           bo.isSuccessLabelVisible = true
         }
       }
-      contentPanel.add(JBLabel(PropertiesComponent.getInstance(project).getValue("sentry_auth_token").toString()), BorderLayout.NORTH)
       contentPanel.add(bo, BorderLayout.CENTER)
     }
   }
